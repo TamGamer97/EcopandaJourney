@@ -1,0 +1,357 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body style="background-color: #6dbaa6;">
+
+    
+    <div style="width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center;">
+        <h1 style="position: absolute; top: 50px; text-align: center;">Welcome to</h1>
+        <h1 class="gameTxt" style="position: absolute; top: 80px; transition: 1s; text-align: center; cursor: pointer; font-weight: 350;">Ecopanda Journey</h1>
+        
+        <h1 style="position: absolute; top: 50px; text-align: center;">Welcome to</h1>
+        <canvas id="gameCanvas" style="background-color: #6ab39f;"> </canvas>
+    </div>
+</body>
+<script>
+    // Get the canvas element
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Set canvas size
+canvas.width = window.innerWidth - 100;
+canvas.height = 300;
+
+// Image objects
+const images = {
+    player: new Image(),
+    obstacle: new Image(),
+    collectible: new Image(),
+    ground: new Image()
+};
+
+// Load images
+images.player.src = '/assets/panda.jpg';
+images.obstacle.src = '/assets/fire.png';
+images.collectible.src = '/assets/plant.png';
+images.ground.src = '/assets/floor.png';
+
+// Player
+const player = {
+    x: 50,
+    y: 200,
+    width: 40,
+    height: 40,
+    jumping: false,
+    jumpStrength: 12,
+    gravity: 0.6,
+    velocity: 0
+};
+
+// Obstacles
+const obstacles = [];
+
+// Collectibles
+const collectibles = [];
+
+// Clouds
+const clouds = [];
+
+// Game variables
+let score = 0;
+let gameSpeed = 5;
+let gameOver = false;
+let lastObstacleTime = 0;
+const minObstacleInterval = 1000; // Minimum time between obstacles in milliseconds
+let groundX = 0; // New variable to track ground position
+
+// Function to draw the player
+function drawPlayer() {
+    ctx.drawImage(images.player, player.x, player.y, player.width, player.height);
+}
+
+// Function to update player position
+function updatePlayer() {
+    if (player.jumping) {
+        player.velocity += player.gravity;
+        player.y += player.velocity;
+
+        if (player.y > 200) {
+            player.y = 200;
+            player.jumping = false;
+            player.velocity = 0;
+        }
+    }
+}
+
+// Function to create obstacles
+function createObstacle() {
+    const currentTime = Date.now();
+    if (currentTime - lastObstacleTime < minObstacleInterval) {
+        return; // Don't create an obstacle if it's too soon
+    }
+
+    const obstacle = {
+        x: canvas.width,
+        y: Math.random() < 0.5 ? 200 : 150,
+        width: 40,
+        height: 40
+    };
+
+    // Check if this obstacle is too close to the last two obstacles
+    const lastTwo = obstacles.slice(-2);
+    const tooClose = lastTwo.some(obs => obs.x > canvas.width - 200);
+
+    if (!tooClose) {
+        obstacles.push(obstacle);
+        lastObstacleTime = currentTime;
+    }
+}
+
+// Function to create collectibles
+function createCollectible() {
+    const collectible = {
+        x: canvas.width,
+        y: Math.random() * (canvas.height - 70) + 20, // Adjust y-range to avoid placing on ground
+        width: 35,
+        height: 35
+    };
+    collectibles.push(collectible);
+}
+
+// Function to draw obstacles
+function drawObstacles() {
+    obstacles.forEach(obstacle => {
+        ctx.drawImage(images.obstacle, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    });
+}
+
+// Function to draw collectibles
+function drawCollectibles() {
+    collectibles.forEach(collectible => {
+        ctx.drawImage(images.collectible, collectible.x, collectible.y, collectible.width, collectible.height);
+    });
+}
+
+// Function to create a cloud
+function createCloud() {
+    const cloud = {
+        x: canvas.width,
+        y: Math.random() * (canvas.height / 2),
+        width: Math.random() * 60 + 40,
+        height: Math.random() * 30 + 20,
+        speed: Math.random() * 0.5 + 2
+    };
+    clouds.push(cloud);
+}
+
+// Function to draw clouds
+function drawClouds() {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    clouds.forEach(cloud => {
+        ctx.beginPath();
+        ctx.arc(cloud.x, cloud.y, cloud.width / 2, 0, Math.PI * 2);
+        ctx.arc(cloud.x + cloud.width * 0.35, cloud.y - cloud.height * 0.2, cloud.width * 0.3, 0, Math.PI * 2);
+        ctx.arc(cloud.x + cloud.width * 0.6, cloud.y, cloud.width * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// Function to update clouds
+function updateClouds() {
+    if(gameOver) {return}
+    clouds.forEach(cloud => {
+        cloud.x -= cloud.speed;
+    });
+
+    // Remove off-screen clouds
+    clouds.splice(0, clouds.filter(cloud => cloud.x + cloud.width < 0).length);
+
+    // Add new clouds
+    if (Math.random() < 0.005) createCloud();
+}
+
+// Function to draw the ground
+function drawGround() {
+    const groundHeight = 50;
+    let drawX = groundX;
+
+    // Draw ground tiles
+    while (drawX < canvas.width) {
+        ctx.drawImage(images.ground, drawX, canvas.height - groundHeight);
+        drawX += images.ground.width;
+    }
+
+    // Draw an extra tile to the left for seamless scrolling
+    ctx.drawImage(images.ground, groundX - images.ground.width, canvas.height - groundHeight);
+
+    // Move the ground
+    if(!gameOver)
+    {
+        groundX -= gameSpeed;
+    
+        // Reset ground position when it has moved by one full tile
+        if (groundX <= -images.ground.width) {
+            groundX += images.ground.width;
+        }
+    }
+}
+
+// Function to update game objects
+function updateGame() {
+    if (gameOver) return;
+
+    obstacles.forEach(obstacle => {
+        obstacle.x -= gameSpeed;
+    });
+
+    collectibles.forEach(collectible => {
+        collectible.x -= gameSpeed;
+    });
+
+    // Remove off-screen obstacles and collectibles
+    obstacles.splice(0, obstacles.filter(obs => obs.x + obs.width < 0).length);
+    collectibles.splice(0, collectibles.filter(col => col.x + col.width < 0).length);
+
+    // Check for collisions
+    obstacles.forEach(obstacle => {
+        if (
+            player.x < obstacle.x + obstacle.width &&
+            player.x + player.width > obstacle.x &&
+            player.y < obstacle.y + obstacle.height &&
+            player.y + player.height > obstacle.y
+        ) {
+            gameOver = true;
+            console.log('Game Over!');
+        }
+    });
+
+    collectibles.forEach((collectible, index) => {
+        if (
+            player.x < collectible.x + collectible.width &&
+            player.x + player.width > collectible.x &&
+            player.y < collectible.y + collectible.height &&
+            player.y + player.height > collectible.y
+        ) {
+            collectibles.splice(index, 1);
+            score +=100;
+        }
+    });
+
+    // Increase game speed over time
+    gameSpeed += 0.001;
+
+    // Create new obstacles and collectibles
+    if (Math.random() < 0.02) createObstacle();
+    if (Math.random() < 0.01) createCollectible();
+}
+
+// Function to display game over screen
+function drawGameOver() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'white';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2);
+
+    ctx.font = '24px Arial';
+    ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 40);
+    ctx.fillText('Press Space to Restart', canvas.width / 2, canvas.height / 2 + 80);
+}
+
+// Main game loop
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw and update clouds
+    drawClouds();
+    updateClouds();
+
+    // Draw scrolling ground
+    drawGround();
+
+    // Draw and update game elements
+    drawPlayer();
+    drawObstacles();
+    drawCollectibles();
+    updatePlayer();
+    updateGame();
+
+    // Display score
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Arial';
+    // ctx.fillText(`Score: ${score}`, 10, 30);
+
+    if (gameOver) {
+        drawGameOver();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Function to reset the game
+function resetGame() {
+    player.y = 200;
+    player.jumping = false;
+    player.velocity = 0;
+    obstacles.length = 0;
+    collectibles.length = 0;
+    clouds.length = 0;
+    score = 0;
+    gameSpeed = 5;
+    gameOver = false;
+    lastObstacleTime = 0;
+    groundX = 0; // Reset ground position
+}
+
+// Event listener for jumping and restarting
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+        event.preventDefault()
+        if (gameOver) {
+            resetGame();
+        } else if (!player.jumping) {
+            player.jumping = true;
+            player.velocity = -player.jumpStrength;
+        }
+    }
+});
+
+// Start the game when all images are loaded
+let loadedImages = 0;
+const totalImages = Object.keys(images).length;
+
+function startGame() {
+    if (++loadedImages === totalImages) {
+        gameLoop();
+    }
+}
+
+// Add load event listeners to all images
+for (let img of Object.values(images)) {
+    img.addEventListener('load', startGame);
+}
+</script>
+</html>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
+
+    * {
+        font-family: "Rubik", sans-serif;
+        font-optical-sizing: auto;
+        font-weight: 300;
+        font-style: normal;
+    }
+
+    .gameTxt:hover{
+        font-size: 50px;
+        text-decoration-line: underline;
+    }
+</style>
