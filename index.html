@@ -368,6 +368,15 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+document.getElementById('gameCanvas').addEventListener('touchstart', () => {
+    if (gameOver) {
+        resetGame();
+    } else if (!player.jumping) {
+        player.jumping = true;
+        player.velocity = -player.jumpStrength;
+    }
+})
+
 // Start the game when all images are loaded
 let loadedImages = 0;
 const totalImages = Object.keys(images).length;
